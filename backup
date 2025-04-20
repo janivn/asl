@@ -1,0 +1,133 @@
+
+processButton.addEventListener('click', processVideo);
+       
+async function processVideo() {
+    let videoFile;
+    
+    if (videoSource === 'file') {
+        videoFile = videoUpload.files[0];
+        console.log("Processing uploaded file:", videoFile.name, videoFile.type);
+    } else if (videoSource === 'camera' && videoBlob) {
+        // Convert blob to File object with proper MIME type
+        const fileName = "recorded_video.mp4";
+        // Use the actual MIME type from the blob
+        const fileType = videoBlob.type;
+        console.log("Creating file from recorded blob with type:", fileType);
+        
+        videoFile = new File([videoBlob], fileName, { 
+            type: fileType,
+            lastModified: new Date().getTime() 
+        });
+    }
+    
+    if (!videoFile) {
+        alert("No video available for processing.");
+        return;
+    }
+
+    // Get trim points
+    const startPercent = parseFloat(startHandle.style.left) / 100;
+    const endPercent = parseFloat(endHandle.style.left) / 100;
+    const startTime = startPercent * videoDuration;
+    const endTime = endPercent * videoDuration;
+
+    // Validate trim times
+    if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
+        alert("Invalid trim selection. Please adjust the trim handles.");
+        return;
+    }
+
+    // Create form data
+    const formData = new FormData();
+    formData.append('video', videoFile);
+    formData.append('start_time', startTime.toFixed(2));
+    formData.append('end_time', endTime.toFixed(2));
+
+    console.log("Sending form data with:", 
+                "Video file:", videoFile.name, 
+                "Video type:", videoFile.type, 
+                "Video size:", videoFile.size, 
+                "Start time:", startTime.toFixed(2), 
+                "End time:", endTime.toFixed(2));
+
+    // Show and reset progress bar and loader
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    progressContainer.style.display = 'block';
+    loader.style.display = 'block';
+    progressBar.style.width = '0%';
+    processButton.disabled = true;
+    textOutput.value = "Processing video... Please wait.";
+
+    // Simulate progress bar during the request
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += 2;
+        progressBar.style.width = Math.min(progress, 98) + '%';
+        
+        if (progress >= 100) clearInterval(progressInterval);
+    }, 200);
+
+    try {
+        const response = await fetch('/process_video', {
+            method: 'POST',
+            body: formData
+        });
+    
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        
+        if (!response.ok) {
+            throw new Error(Server returned ${response.status}: ${response.statusText});
+        }
+        
+        const result = await response.json();
+        console.log("Server response:", result);
+        
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            loader.style.display = 'none';
+            processButton.disabled = false;
+            
+            if (result.error) {
+                textOutput.value = "Error: " + result.error;
+            } else {
+                textOutput.value = "Detected Signs: " + result.translation + "\n\nTagalog Translation: " + result.lexicon_translation;
+            }
+        }, 500);
+    } catch (error) {
+        clearInterval(progressInterval);
+        progressContainer.style.display = 'none';
+        loader.style.display = 'none';
+        processButton.disabled = false;
+        textOutput.value = "Failed to process video. Error: " + error.message;
+        console.error("Processing error:", error);
+    }
+}
+
+function handleTabSwitch(tabId) {
+    // Update tab switching logic
+    if (tabId === 'camera-tab') {
+        // Hide video player when switching to camera tab
+        if (videoPlayer.style.display === 'block') {
+            // Don't remove the source, just hide the player UI
+            videoPlayer.pause();
+            videoPlayer.style.display = 'none';
+            trimBarContainer.style.display = 'none';
+            processButton.style.display = 'none';
+        }
+    } 
+    else if (tabId === 'upload-tab') {
+        // When switching to upload tab, stop camera if it's running
+        if (mediaStream) {
+            stopCamera();
+        }
+        
+        // If we have a recorded video, show it in the upload tab
+        if (videoBlob && videoSource === 'camera') {
+            videoPlayer.style.display = 'block';
+            trimBarContainer.style.display = 'block';
+            processButton.style.display = 'block';
+        }
+    }
+}

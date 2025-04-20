@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>American Sign Language Translator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">    
+</head>
+<body>
+    <!-- Animated Background Elements -->
+    <div class="bg-animation">
+        <div class="blob blob1"></div>
+        <div class="blob blob2"></div>
+        <div class="blob blob3"></div>
+    </div>
+    
+    <div class="particles" id="particles"></div>
+    
+    <h1 class="app-title">American Sign Language Translator</h1>
+
+    <div class="container glassmorphism">
+        <div class="left">
+            <h2 class="section-title">Video Input</h2>
+            
+            <!-- Language Selection Toggle -->
+            
+            
+            <!-- Tab Navigation -->
+            <div class="tab-navigation">
+                <button class="tab-button active" data-tab="upload-tab">
+                    <i class="fas fa-upload"></i> Upload Video
+                </button>
+                <button class="tab-button" data-tab="camera-tab">
+                    <i class="fas fa-camera"></i> Use Camera
+                </button>
+            </div>
+            
+            <!-- Upload Tab Content -->
+            <div id="upload-tab" class="tab-content active">
+                <input type="file" id="videoUpload" accept="video/*" style="display: none;">
+                <button class="button" id="uploadButton" onclick="document.getElementById('videoUpload').click()">
+                    <i class="fas fa-file-video"></i> Select Video File
+                </button>
+            </div>
+            
+            <!-- Camera Tab Content -->
+            <div id="camera-tab" class="tab-content">
+                <div class="camera-container">
+                    <video id="cameraStream" autoplay muted playsinline></video>
+                    <div class="camera-controls">
+                        <button class="button" id="startCamera">
+                            <i class="fas fa-video"></i> Start Camera
+                        </button>
+                        <div class="recording-section" style="display: none;">
+                            <button class="button record-button" id="startRecording">
+                                <i class="fas fa-record-vinyl"></i> Record
+                            </button>
+                            <div class="recording-indicator">
+                                <div class="recording-dot"></div>
+                                <span id="recordingTimer">0</span>s
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <video
+            id="videoPlayer"
+            controls
+            style="display: none; width: 420px; height: 280px;"
+            ></video>
+            
+            <div class="trim-bar-container" id="trimBarContainer">
+                <div class="trim-bar-label">
+                    <span>Trim Video (Max 5 seconds)</span>
+                    <span class="time-label" id="trimTimeLabel">0:00 - 0:00</span>
+                </div>
+                
+                <div class="timeline" id="timeline">
+                    <div class="trim-range" id="trimRange"></div>
+                    
+                    <div class="handle start-handle" id="startHandle"></div>
+                    <div class="indicator" id="startIndicator">
+                        <div class="indicator-label">START</div>
+                    </div>
+                    
+                    <div class="handle end-handle" id="endHandle"></div>
+                    <div class="indicator" id="endIndicator">
+                        <div class="indicator-label">END</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="button" id="processButton" style="display: none;">
+                <i class="fas fa-cogs"></i> Process Video
+            </button>
+            
+            <div id="progressContainer">
+                <div class="lds-spinner" id="progressBar" style="display: none;">
+                    <div></div><div></div><div></div><div></div>
+                    <div></div><div></div><div></div><div></div>
+                    <div></div><div></div><div></div><div></div>
+                  </div>
+            </div>
+            
+            <div class="custom-loader" id="loader" style="display: none;"></div>
+        </div>
+
+        <div class="right">
+            <div class="language-selection">
+                <div class="language-toggle" style="display: none;">
+                    <div class="language-option " id="englishOption">
+                        <i class="fas fa-language"></i> 
+                    </div>
+                    <div class="language-option selected" id="tagalogOption">
+                        <i class="fas fa-globe-asia"></i> 
+                    </div>
+                    <div class="language-slider"></div>
+                </div>
+            </div>
+            <h2 class="section-title">Translation Results</h2>
+            <textarea id="textOutput" placeholder="Translation will appear here after processing..."></textarea>
+        </div>
+    </div>
+
+    <script>
+
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 40;
+            
+            for (let i = 0; i < particleCount; i++) {
+                createParticle();
+            }
+            
+            function createParticle() {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                // Random size between 2px and 4px
+                const size = Math.random() * 2 + 1;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                // Random position
+                const posX = Math.random() * 100;
+                const posY = Math.random() * 100;
+                particle.style.left = `${posX}%`;
+                particle.style.top = `${posY}%`;
+                
+                // Random opacity
+                particle.style.opacity = Math.random() * 0.3 + 0.1;
+                
+                // Animation
+                const duration = Math.random() * 30 + 15;
+                const delay = Math.random() * 5;
+                particle.style.animation = `float${Math.floor(Math.random() * 3) + 1} ${duration}s ${delay}s infinite ease-in-out`;
+                
+                particlesContainer.appendChild(particle);
+            }
+        });
+
+        // Tab Navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // Remove active class from all buttons and contents
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    
+                    // Add active class to current button and content
+                    this.classList.add('active');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+        });
+        // ===============================
+        // COMMON VARIABLES AND ELEMENTS
+        // ===============================
+        const videoPlayer = document.getElementById('videoPlayer');
+        const trimBarContainer = document.getElementById('trimBarContainer');
+        const timeline = document.getElementById('timeline');
+        const trimRange = document.getElementById('trimRange');
+        const startHandle = document.getElementById('startHandle');
+        const endHandle = document.getElementById('endHandle');
+        const textOutput = document.getElementById('textOutput');
+        const trimTimeLabel = document.getElementById('trimTimeLabel');
+        const loader = document.getElementById('loader');
+        const processButton = document.getElementById('processButton');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        let mediaStream=null;
+        let videoDuration = 0;
+        let isDragging = null;
+        const maxTrimSeconds = 5;
+        let videoSource = null; // 'file' or 'camera'
+        let videoBlob = null;
+
+        // ===============================
+        // TAB NAVIGATION FUNCTIONS
+        // ===============================
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons and tabs
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked button and corresponding tab
+                button.classList.add('active');
+                const tabId = button.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+                
+                // Handle tab-specific actions
+                handleTabSwitch(tabId);
+            });
+        });
+        
+
+        // ===============================
+        // COMMON UTILITY FUNCTIONS
+        // ===============================
+        
+        // Format time to MM:SS
+        function formatTime(seconds) {
+            if (isNaN(seconds) || !isFinite(seconds)) {
+                return "0:00"; // Return default value for invalid input
+            }
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Reset video player state
+        function resetVideoPlayer() {
+            videoPlayer.style.display = 'none';
+            videoPlayer.src = '';
+            processButton.style.display = 'none';
+            trimBarContainer.style.display = 'none';
+            textOutput.value = '';
+            videoBlob = null;
+            videoSource = null;
+        }
+
+        // ===============================
+        // VIDEO UPLOAD FUNCTIONS
+        // ===============================
+        const videoUpload = document.getElementById('videoUpload');
+        const uploadButton = document.getElementById('uploadButton');
+
+        // File upload handler
+        videoUpload.addEventListener('change', () => {
+            const file = videoUpload.files[0];
+            if (file) {
+                videoSource = 'file';
+                videoPlayer.src = URL.createObjectURL(file);
+                videoPlayer.style.display = 'block';
+        
+                // Clear previous duration in case there's a problem
+                videoDuration = 0;
+        
+                videoPlayer.onloadedmetadata = () => {
+                    safelySetVideoDuration();
+                    processButton.style.display = 'block';
+                    trimBarContainer.style.display = 'block';
+                };
+        
+                // Add error handler
+                videoPlayer.onerror = (e) => {
+                    console.error("Video loading error:", e);
+                    alert("Error loading video. Please try another file.");
+                    resetVideoPlayer();
+                };
+        
+                textOutput.value = '';
+            }
+        }); 
+        
+        // ===============================
+        // CAMERA FUNCTIONS
+        // ===============================
+
+       
+        document.addEventListener('DOMContentLoaded', function() {
+            const cameraStream = document.getElementById('cameraStream');
+            const startCameraButton = document.getElementById('startCamera');
+            const startRecordingButton = document.getElementById('startRecording');
+            const recordingTimer = document.getElementById('recordingTimer');
+            const recordingSection = document.querySelector('.recording-section');
+        
+            // Camera variables
+            let mediaStream = null;
+            let mediaRecorder = null;
+            let recordedChunks = [];
+            let recordingInterval = null;
+            let recordingTime = 0;
+            let countdownInterval = null;
+            let isCameraActive = false;
+        
+            // Camera functions
+            startCameraButton.addEventListener('click', () => {
+                if (isCameraActive) {
+                    stopCamera();
+                } else {
+                    startCamera();
+                }
+            });
+        
+            startRecordingButton.addEventListener('click', () => {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    stopRecording();
+                } else {
+                    // Start countdown before recording
+                    startCountdown(3);
+                }
+            });
+        
+            function startCamera() {
+                // If we already have a video player showing, hide it
+                if (videoPlayer.style.display === 'block') {
+                    videoPlayer.pause();
+                    videoPlayer.style.display = 'none';
+                    trimBarContainer.style.display = 'none';
+                    processButton.style.display = 'none';
+                }
+                
+                const constraints = { 
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    }, 
+                    audio: true 
+                };
+                
+                navigator.mediaDevices.getUserMedia(constraints)
+                    .then(stream => {
+                        mediaStream = stream;
+                        cameraStream.srcObject = stream;
+                        cameraStream.style.display = 'block';
+                        startCameraButton.innerHTML = '<i class="fas fa-video-slash"></i> Stop Camera';
+                        recordingSection.style.display = 'flex';
+                        isCameraActive = true;
+                        
+                        // Reset any previous recording state
+                        resetRecordingState();
+                    })
+                    .catch(error => {
+                        console.error('Error accessing camera:', error);
+                        showNotification('Failed to access camera. Please check permissions.', 'error');
+                    });
+            }
+        
+            function stopCamera() {
+                // Find the camera-related elements
+                const cameraStream = document.getElementById('cameraStream');
+                const startCameraButton = document.getElementById('startCamera');
+                const recordingSection = document.querySelector('.recording-section');
+                
+                // Stop all tracks in the mediaStream if it exists
+                if (cameraStream && cameraStream.srcObject) {
+                    const tracks = cameraStream.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                    cameraStream.srcObject = null;
+                }
+                
+                // Reset UI elements
+                if (cameraStream) cameraStream.style.display = 'none';
+                if (startCameraButton) startCameraButton.innerHTML = '<i class="fas fa-video"></i> Start Camera';
+                if (recordingSection) recordingSection.style.display = 'none';
+                
+                // Show video player if we have a recording
+                if (videoBlob && videoSource === 'camera') {
+                    videoPlayer.style.display = 'block';
+                    trimBarContainer.style.display = 'block';
+                    processButton.style.display = 'block';
+                }
+            }
+        
+            function startCountdown(seconds) {
+                // Create countdown overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'camera-overlay';
+                overlay.id = 'countdownOverlay';
+                
+                const countdownElement = document.createElement('div');
+                countdownElement.className = 'countdown';
+                countdownElement.textContent = seconds;
+                
+                overlay.appendChild(countdownElement);
+                document.querySelector('.camera-container').appendChild(overlay);
+                
+                let countdown = seconds;
+                
+                countdownInterval = setInterval(() => {
+                    countdown--;
+                    countdownElement.textContent = countdown;
+                    
+                    if (countdown <= 0) {
+                        clearInterval(countdownInterval);
+                        document.querySelector('.camera-container').removeChild(overlay);
+                        startRecording();
+                    }
+                }, 1000);
+            }
+        
+            function startRecording() {
+                if (!mediaStream) return;
+                
+                recordedChunks = [];
+                
+                // Try VP8 first as it has better compatibility
+                const options = { mimeType: 'video/webm;codecs=vp8,opus' };
+                try {
+                    mediaRecorder = new MediaRecorder(mediaStream, options);
+                } catch (e) {
+                    console.error('VP8 MediaRecorder error:', e);
+                    try {
+                        // Try VP9 as fallback
+                        mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm;codecs=vp9,opus' });
+                    } catch (e2) {
+                        console.error('VP9 MediaRecorder error:', e2);
+                        try {
+                            // Last resort - basic webm without specifying codecs
+                            mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm' });
+                        } catch (e3) {
+                            console.error('Basic WebM MediaRecorder error:', e3);
+                            showNotification('Recording not supported in this browser.', 'error');
+                            return;
+                        }
+                    }
+                }
+                
+                console.log("MediaRecorder created with mimeType:", mediaRecorder.mimeType);
+                
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = finishRecording;
+                
+                // Start recording with smaller chunk size
+                mediaRecorder.start(100);
+                startRecordingButton.innerHTML = '<i class="fas fa-stop"></i> Stop';
+                startRecordingButton.classList.add('recording');
+                
+                // Setup timer
+                recordingTime = 0;
+                recordingTimer.textContent = recordingTime;
+                document.querySelector('.recording-indicator').style.display = 'flex';
+                
+                recordingInterval = setInterval(() => {
+                    recordingTime += 1;
+                    recordingTimer.textContent = recordingTime;
+                    
+                    // Auto stop at 5 seconds
+                    if (recordingTime >= maxTrimSeconds) {
+                        stopRecording();
+                    }
+                }, 1000);
+            }
+        
+            function stopRecording() {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    clearInterval(recordingInterval);
+                    recordingInterval = null;
+                    
+                    // Reset recording UI
+                    startRecordingButton.innerHTML = '<i class="fas fa-record-vinyl"></i> Record';
+                    startRecordingButton.classList.remove('recording');
+                    document.querySelector('.recording-indicator').style.display = 'none';
+                }
+            }
+        
+            function finishRecording() {
+                showLoadingOverlay('Processing video...');
+            
+                const mimeType = mediaRecorder ? mediaRecorder.mimeType : 'video/webm';
+                console.log("Creating blob with mimeType:", mimeType);
+            
+                const blob = new Blob(recordedChunks, { type: mimeType });
+                videoSource = 'camera';
+                videoBlob = blob;
+            
+                console.log("Blob created with size:", blob.size, "bytes");
+            
+                const videoUrl = URL.createObjectURL(blob);
+                let hasHandled = false;
+            
+                function safeHandleVideoLoad() {
+                    if (hasHandled) return;
+                    hasHandled = true;
+            
+                    removeLoadingOverlay();
+            
+                    const accurateDuration = recordingTime;
+                    console.log("Duration from recording timer:", accurateDuration);
+            
+                    stopCamera();
+            
+                    videoDuration = accurateDuration;
+                    videoPlayer.src = videoUrl;
+                    videoPlayer.style.display = 'block';
+            
+                    processButton.style.display = 'block';
+                    trimBarContainer.style.display = 'block';
+            
+                    setHandlesAt(0, accurateDuration);
+            
+                    document.querySelector('[data-tab="upload-tab"]').click();
+                    showNotification('Video recorded successfully! You can now trim and process it.', 'success');
+                }
+            
+                videoPlayer.src = videoUrl;
+            
+                videoPlayer.onloadedmetadata = function () {
+                    if (videoPlayer.duration && isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
+                        videoDuration = videoPlayer.duration;
+                    }
+                    safeHandleVideoLoad();
+                };
+            
+                videoPlayer.onerror = safeHandleVideoLoad;
+            
+                setTimeout(safeHandleVideoLoad, 2000);
+            }
+        
+            function resetRecordingState() {
+                if (recordingInterval) {
+                    clearInterval(recordingInterval);
+                    recordingInterval = null;
+                }
+                
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    
+                    // Remove countdown overlay if it exists
+                    const overlay = document.getElementById('countdownOverlay');
+                    if (overlay) {
+                        overlay.parentNode.removeChild(overlay);
+                    }
+                }
+                
+                recordingTime = 0;
+                recordingTimer.textContent = '0';
+                document.querySelector('.recording-indicator').style.display = 'none';
+                startRecordingButton.innerHTML = '<i class="fas fa-record-vinyl"></i> Record';
+                startRecordingButton.classList.remove('recording');
+                recordedChunks = [];
+            }
+        
+            function showLoadingOverlay(message) {
+                // Create loading overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'camera-overlay';
+                overlay.id = 'loadingOverlay';
+                
+                const spinner = document.createElement('div');
+                spinner.className = 'custom-loader';
+                
+                const messageElement = document.createElement('div');
+                messageElement.style = 'margin-top: 15px; font-size: 16px;';
+                messageElement.textContent = message;
+                
+                overlay.appendChild(spinner);
+                overlay.appendChild(messageElement);
+                document.querySelector('.camera-container').appendChild(overlay);
+            }
+        
+            function removeLoadingOverlay() {
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.parentNode.removeChild(overlay);
+                }
+            }
+        
+            function showNotification(message, type) {
+                // Create notification element
+                const notification = document.createElement('div');
+                notification.className = `alert alert-${type}`;
+                notification.textContent = message;
+                notification.style.display = 'block';
+                
+                // Find a place to append it
+                const rightPanel = document.querySelector('.right');
+                rightPanel.insertBefore(notification, rightPanel.firstChild);
+                
+                // Auto remove after 5 seconds
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }, 5000);
+                
+                // Add transition
+                notification.style.transition = 'opacity 0.3s ease';
+            }
+        });
+        
+        function handleDurationFailure(videoUrl) {
+            console.warn("Fallback: Using estimated duration");
+            
+            // Set a default duration
+            videoDuration = 5;  // Default to 5 seconds
+            
+            // Set up video player
+            videoPlayer.src = videoUrl;
+            videoPlayer.style.display = 'block';
+            
+            // Initialize trim UI
+            processButton.style.display = 'block';
+            trimBarContainer.style.display = 'block';
+            
+            // Initialize trim handles with default positions
+            initializeHandlePositions();
+        }
+        
+        // Add this helper function to safely initialize handle positions
+        function initializeHandlePositions() {
+            // Validate video duration
+            if (!isFinite(videoDuration) || videoDuration <= 0) {
+                console.warn("Cannot initialize handles: Invalid video duration");
+                // Set default values instead of returning
+                videoDuration = 5; // Default duration
+            }
+            
+            // Set handles at default positions - start at 0%, end at max allowed duration
+            startHandle.style.left = '0%';
+            const maxDurationPercent = Math.min(100, (maxTrimSeconds / videoDuration) * 100);
+            endHandle.style.left = maxDurationPercent + '%';
+            
+            // Update UI
+            updateTrimRange();
+            updateTimeLabel();
+        }
+        function safelySetVideoDuration() {
+            if (videoPlayer.readyState >= 1) {
+                const duration = videoPlayer.duration;
+                if (isFinite(duration) && duration > 0) {
+                    videoDuration = duration;
+                    console.log("Video duration set to:", videoDuration);
+                    
+                    // Initialize handles with the correct duration
+                    initializeHandlePositions();
+                } else {
+                    console.warn("Invalid video duration:", duration);
+                    // Set a default duration
+                    videoDuration = 5;
+                    initializeHandlePositions();
+                }
+            }
+        }
+        
+        
+
+        // ===============================
+        // TRIM CONTROLS FUNCTIONS
+        // ===============================
+        function setHandlesAt(startTime, endTime) {
+            // Early return if video duration is invalid
+            if (!isFinite(videoDuration) || videoDuration <= 0) {
+                console.warn("Cannot set handles: Invalid video duration");
+                return;
+            }
+            
+            // Validate inputs
+            if (isNaN(startTime) || !isFinite(startTime) || startTime < 0) {
+                startTime = 0;
+            }
+            
+            if (isNaN(endTime) || !isFinite(endTime) || endTime <= startTime) {
+                endTime = Math.min(startTime + 5, videoDuration);
+            }
+            
+            // Ensure values are within bounds
+            startTime = Math.max(0, Math.min(startTime, videoDuration));
+            endTime = Math.max(startTime + 0.5, Math.min(endTime, videoDuration));
+            
+            // Calculate percentages
+            const startPercent = (startTime / videoDuration) * 100;
+            const endPercent = (endTime / videoDuration) * 100;
+            
+            // Set handle positions using percentage values
+            startHandle.style.left = startPercent + '%';
+            endHandle.style.left = endPercent + '%';
+            
+            // Update UI
+            updateTrimRange();
+            updateTimeLabel();
+            
+            // Set video to start position if ready, with validation
+            if (videoPlayer.readyState >= 1 && isFinite(startTime) && startTime >= 0) {
+                videoPlayer.currentTime = startTime;
+            }
+        }
+        function updateTrimRange() {
+            // Get current handle positions with validation
+            let startPercent = parseFloat(startHandle.style.left);
+            let endPercent = parseFloat(endHandle.style.left);
+            
+            // Validate percentages
+            if (isNaN(startPercent) || !isFinite(startPercent)) startPercent = 0;
+            if (isNaN(endPercent) || !isFinite(endPercent)) endPercent = 100;
+            
+            // Ensure they're in valid range
+            startPercent = Math.max(0, Math.min(startPercent, 100));
+            endPercent = Math.max(startPercent, Math.min(endPercent, 100));
+            
+            // Apply styles
+            trimRange.style.left = `${startPercent}%`;
+            trimRange.style.width = `${endPercent - startPercent}%`;
+        
+            // Update indicators on the timeline
+            document.getElementById('startIndicator').style.left = `${startPercent}%`;
+            document.getElementById('endIndicator').style.left = `${endPercent}%`;
+        }
+
+        function updateTimeLabel() {
+            if (isNaN(videoDuration) || videoDuration <= 0) {
+                trimTimeLabel.textContent = "0:00 - 0:00";
+                return;
+            }
+            
+            // Get percentages with validation
+            let startPercent = parseFloat(startHandle.style.left);
+            let endPercent = parseFloat(endHandle.style.left);
+            
+            // Validate and sanitize percentages
+            if (isNaN(startPercent) || !isFinite(startPercent)) startPercent = 0;
+            if (isNaN(endPercent) || !isFinite(endPercent)) endPercent = 100;
+            
+            // Ensure they're in valid range
+            startPercent = Math.max(0, Math.min(startPercent, 100));
+            endPercent = Math.max(startPercent, Math.min(endPercent, 100));
+            
+            // Calculate time values
+            const startTime = (startPercent / 100) * videoDuration;
+            const endTime = (endPercent / 100) * videoDuration;
+            
+            // Format and display the times
+            trimTimeLabel.textContent = `${formatTime(startTime)} - ${formatTime(endTime)}`;
+        }
+        
+
+        [startHandle, endHandle].forEach(handle => {
+            handle.addEventListener('mousedown', () => {
+                isDragging = handle === startHandle ? 'start' : 'end';
+                document.addEventListener('mousemove', onDrag);
+                document.addEventListener('mouseup', () => {
+                    isDragging = null;
+                    document.removeEventListener('mousemove', onDrag);
+                });
+            });
+        });
+
+        function onDrag(e) {
+            if (!videoDuration || videoDuration <= 0 || !isFinite(videoDuration)) {
+                console.warn("Cannot drag: Invalid video duration");
+                return;
+            }
+            
+            const rect = timeline.getBoundingClientRect();
+            let percent = ((e.clientX - rect.left) / rect.width) * 100;
+            percent = Math.max(0, Math.min(100, percent));  // Lock inside timeline
+        
+            // Get current handle positions with validation
+            let startPercent = parseFloat(startHandle.style.left) || 0;
+            let endPercent = parseFloat(endHandle.style.left) || 100;
+            
+            if (isNaN(startPercent) || !isFinite(startPercent)) startPercent = 0;
+            if (isNaN(endPercent) || !isFinite(endPercent)) endPercent = 100;
+        
+            const minGap = (0.5 / videoDuration) * 100;   // 0.5 second gap in percent
+            const maxGap = (maxTrimSeconds / videoDuration) * 100;  // 5 second max gap
+        
+            if (isDragging === 'start') {
+                if (percent > endPercent - minGap) {
+                    // Push end if start gets too close
+                    const newEndPercent = percent + minGap;
+                    if (newEndPercent <= 100) {
+                        endHandle.style.left = `${newEndPercent}%`;
+                    }
+                }
+                if (percent > endPercent) {
+                    percent = endPercent;  // Start can't pass end
+                }
+                startHandle.style.left = `${percent}%`;
+                
+                // Limit max trim length
+                if (endPercent - percent > maxGap) {
+                    endHandle.style.left = `${percent + maxGap}%`;
+                }
+            } else if (isDragging === 'end') {
+                if (percent < startPercent + minGap) {
+                    // Push start if end gets too close
+                    const newStartPercent = percent - minGap;
+                    if (newStartPercent >= 0) {
+                        startHandle.style.left = `${newStartPercent}%`;
+                    }
+                }
+                if (percent < startPercent) {
+                    percent = startPercent;  // End can't pass start
+                }
+                endHandle.style.left = `${percent}%`;
+                
+                // Limit max trim length
+                if (percent - startPercent > maxGap) {
+                    startHandle.style.left = `${percent - maxGap}%`;
+                }
+            }
+        
+            updateTrimRange();
+            updateTimeLabel();
+            
+            // Update video position - FIX HERE: Add validation before setting currentTime
+            if (videoPlayer.readyState >= 1) {
+                const currentStartPercent = parseFloat(startHandle.style.left) || 0;
+                const newTime = (currentStartPercent / 100) * videoDuration;
+                
+                // Only set currentTime if it's a valid, finite number
+                if (isFinite(newTime) && newTime >= 0) {
+                    videoPlayer.currentTime = newTime;
+                }
+            }
+        }
+
+        videoPlayer.addEventListener('timeupdate', () => {
+            if (!isFinite(videoDuration) || videoDuration <= 0) return;
+            
+            const startPercent = parseFloat(startHandle.style.left) || 0;
+            const endPercent = parseFloat(endHandle.style.left) || 100;
+            
+            if (isNaN(startPercent) || !isFinite(startPercent)) return;
+            if (isNaN(endPercent) || !isFinite(endPercent)) return;
+            
+            const start = (startPercent / 100) * videoDuration;
+            const end = (endPercent / 100) * videoDuration;
+            
+            if (!isFinite(start) || !isFinite(end)) return;
+            
+            if (videoPlayer.currentTime < start || videoPlayer.currentTime > end) {
+                videoPlayer.currentTime = start;
+            }
+        });
+
+        // ===============================
+        // VIDEO PROCESSING FUNCTION
+        // ===============================
+        processButton.addEventListener('click', processVideo);
+       
+        async function processVideo() {
+            let videoFile;
+            
+            if (videoSource === 'file') {
+                videoFile = videoUpload.files[0];
+                console.log("Processing uploaded file:", videoFile.name, videoFile.type);
+            } else if (videoSource === 'camera' && videoBlob) {
+                // Convert blob to File object with proper MIME type
+                const fileName = "recorded_video.mp4";
+                // Use the actual MIME type from the blob
+                const fileType = videoBlob.type;
+                console.log("Creating file from recorded blob with type:", fileType);
+                
+                videoFile = new File([videoBlob], fileName, { 
+                    type: fileType,
+                    lastModified: new Date().getTime() 
+                });
+            }
+            
+            if (!videoFile) {
+                alert("No video available for processing.");
+                return;
+            }
+        
+            // Get trim points
+            const startPercent = parseFloat(startHandle.style.left) / 100;
+            const endPercent = parseFloat(endHandle.style.left) / 100;
+            const startTime = startPercent * videoDuration;
+            const endTime = endPercent * videoDuration;
+        
+            // Validate trim times
+            if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
+                alert("Invalid trim selection. Please adjust the trim handles.");
+                return;
+            }
+        
+            // Create form data
+            const formData = new FormData();
+            formData.append('video', videoFile);
+            formData.append('start_time', startTime.toFixed(2));
+            formData.append('end_time', endTime.toFixed(2));
+        
+            console.log("Sending form data with:", 
+                        "Video file:", videoFile.name, 
+                        "Video type:", videoFile.type, 
+                        "Video size:", videoFile.size, 
+                        "Start time:", startTime.toFixed(2), 
+                        "End time:", endTime.toFixed(2));
+        
+            // Show and reset progress bar and loader
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            progressContainer.style.display = 'block';
+            loader.style.display = 'block';
+            progressBar.style.width = '0%';
+            processButton.disabled = true;
+            textOutput.value = "Processing video... Please wait.";
+        
+            // Simulate progress bar during the request
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 2;
+                progressBar.style.width = Math.min(progress, 98) + '%';
+                
+                if (progress >= 100) clearInterval(progressInterval);
+            }, 200);
+        
+            try {
+                const response = await fetch('/process_video', {
+                    method: 'POST',
+                    body: formData
+                });
+            
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                console.log("Server response:", result);
+                
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    loader.style.display = 'none';
+                    processButton.disabled = false;
+                    
+                    if (result.error) {
+                        textOutput.value = "Error: " + result.error;
+                    } else {
+                        textOutput.value = "Detected Signs: " + result.translation + "\n\nTagalog Translation: " + result.lexicon_translation;
+                    }
+                }, 500);
+            } catch (error) {
+                clearInterval(progressInterval);
+                progressContainer.style.display = 'none';
+                loader.style.display = 'none';
+                processButton.disabled = false;
+                textOutput.value = "Failed to process video. Error: " + error.message;
+                console.error("Processing error:", error);
+            }
+        }
+
+        function handleTabSwitch(tabId) {
+            // Update tab switching logic
+            if (tabId === 'camera-tab') {
+                // Hide video player when switching to camera tab
+                if (videoPlayer.style.display === 'block') {
+                    // Don't remove the source, just hide the player UI
+                    videoPlayer.pause();
+                    videoPlayer.style.display = 'none';
+                    trimBarContainer.style.display = 'none';
+                    processButton.style.display = 'none';
+                }
+            } 
+            else if (tabId === 'upload-tab') {
+                // When switching to upload tab, stop camera if it's running
+                if (mediaStream) {
+                    stopCamera();
+                }
+                
+                // If we have a recorded video, show it in the upload tab
+                if (videoBlob && videoSource === 'camera') {
+                    videoPlayer.style.display = 'block';
+                    trimBarContainer.style.display = 'block';
+                    processButton.style.display = 'block';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
